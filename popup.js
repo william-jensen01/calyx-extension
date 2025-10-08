@@ -1,3 +1,5 @@
+const browser = globalThis.browser || globalThis.chrome;
+
 let extractedSchedule = [];
 let extractedSelf = null;
 let extractedUsers = [];
@@ -59,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		console.log("[POPUP] Loading API enpdoint reference...");
 
 		try {
-			const result = await chrome.storage.local.get([
+			const result = await browser.storage.local.get([
 				"apiConnections",
 				"activeApiEndpoint",
 			]);
@@ -140,7 +142,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		try {
 			// Request connection to selected endpoint (will reuse existing token if valid)
 			const response = await new Promise((resolve) => {
-				chrome.runtime.sendMessage(
+				browser.runtime.sendMessage(
 					{
 						action: "connectToEndpoint",
 						endpoint: targetEndpoint,
@@ -163,7 +165,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					postApiBtn.textContent = "Send to API";
 				}
 
-				return { success: true, edpoint: targetEndpoint };
+				return { success: true, endpoint: targetEndpoint };
 			} else {
 				throw new Error(response?.error || "Connection failed");
 			}
@@ -193,7 +195,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		try {
 			// Get existing connections
-			const storage = await chrome.storage.local.get([
+			const storage = await browser.storage.local.get([
 				"apiConnections",
 				"activeApiEndpoint",
 			]);
@@ -206,7 +208,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// If this was the active endpoint, we need to clear that too
 			if (storage.activeApiEndpoint === selectedApiEndpoint) {
-				await chrome.storage.local.set({
+				await browser.storage.local.set({
 					activeApiEndpoint: null,
 					apiConnections,
 				});
@@ -245,7 +247,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	// MARK: Update Connection Status
 	async function updateConnectionStatus() {
 		try {
-			const storage = await chrome.storage.local.get([
+			const storage = await browser.storage.local.get([
 				"apiConnections",
 				"activeApiEndpoint",
 			]);
@@ -406,7 +408,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		try {
 			// Check registration status
 			const registrationStatus = await new Promise((resolve) => {
-				chrome.runtime.sendMessage(
+				browser.runtime.sendMessage(
 					{ action: "checkRegistration" },
 					(response) => resolve(response)
 				);
@@ -483,7 +485,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	// MARK: Get API Configuration
 	async function getApiConfig() {
 		return new Promise((resolve, reject) => {
-			chrome.runtime.sendMessage(
+			browser.runtime.sendMessage(
 				{ action: "getApiToken" },
 				(response) => {
 					if (response.success) {
@@ -652,7 +654,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		console.log("[POPUP] Loading cached data...");
 
 		try {
-			const result = await chrome.storage.local.get([
+			const result = await browser.storage.local.get([
 				"scheduleData",
 				"extractedAt",
 				"selfUserData",
@@ -731,7 +733,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		);
 
 		try {
-			await chrome.storage.local.set({
+			await browser.storage.local.set({
 				selfUserData: extractedSelf,
 				selfExtractedAt: new Date().toISOString(),
 			});
@@ -747,7 +749,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		console.log("[POPUP] Saving users data to storage...");
 
 		try {
-			await chrome.storage.local.set({
+			await browser.storage.local.set({
 				usersData: extractedUsers,
 				usersExtractedAt: new Date().toISOString(),
 			});
@@ -799,7 +801,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				apiData: apiData,
 			};
 
-			await chrome.storage.local.set({
+			await browser.storage.local.set({
 				scheduleData: dataToSave,
 				extractedAt: new Date().toISOString(),
 			});
@@ -815,7 +817,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		console.log("[POPUP] Clearing cached data...");
 
 		try {
-			await chrome.storage.local.remove([
+			await browser.storage.local.remove([
 				"scheduleData",
 				"extractedAt",
 				// "selfUserData",
@@ -880,10 +882,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		selfBtn.disabled = true;
 		selfBtn.textContent = "Extracting...";
 
-		chrome.tabs.query(
+		browser.tabs.query(
 			{ active: true, currentWindow: true },
 			function (tabs) {
-				chrome.tabs.sendMessage(
+				browser.tabs.sendMessage(
 					tabs[0].id,
 					{ action: "extractSelf" },
 					function (response) {
@@ -920,10 +922,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// MARK: Extract Users
 	function extractUsers() {
-		chrome.tabs.query(
+		browser.tabs.query(
 			{ active: true, currentWindow: true },
 			function (tabs) {
-				chrome.tabs.sendMessage(
+				browser.tabs.sendMessage(
 					tabs[0].id,
 					{ action: "extractUsers" },
 					function (response) {
@@ -977,10 +979,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// MARK: Extract Store Schedule
 	function extractStoreSchedule() {
-		chrome.tabs.query(
+		browser.tabs.query(
 			{ active: true, currentWindow: true },
 			function (tabs) {
-				chrome.tabs.sendMessage(
+				browser.tabs.sendMessage(
 					tabs[0].id,
 					{ action: "extractStoreSchedule" },
 					function (response) {
@@ -1025,10 +1027,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// MARK: Extract Schedule
 	function extractSchedule(weeks) {
-		chrome.tabs.query(
+		browser.tabs.query(
 			{ active: true, currentWindow: true },
 			function (tabs) {
-				chrome.tabs.sendMessage(
+				browser.tabs.sendMessage(
 					tabs[0].id,
 					{ action: "extractSchedule", weeks: weeks },
 					function (response) {
@@ -1146,10 +1148,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		showStatus(`Completing self extraction...`, "info");
 
 		// Complete the extraction with selected store
-		chrome.tabs.query(
+		browser.tabs.query(
 			{ active: true, currentWindow: true },
 			function (tabs) {
-				chrome.tabs.sendMessage(
+				browser.tabs.sendMessage(
 					tabs[0].id,
 					{
 						action: "extractSelfWithStore",
@@ -1348,7 +1350,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const blob = new Blob([icsContent], { type: "text/calendar" });
 		const url = URL.createObjectURL(blob);
 
-		chrome.downloads.download(
+		browser.downloads.download(
 			{
 				url: url,
 				filename: "work-schedule.ics",
@@ -1399,7 +1401,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	//   private token: string | null = null;
 
 	//   async initialize() {
-	//     const { apiToken } = await chrome.storage.local.get("apiToken");
+	//     const { apiToken } = await browser.storage.local.get("apiToken");
 	//     this.token = apiToken;
 	//   }
 

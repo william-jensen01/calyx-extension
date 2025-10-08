@@ -1,5 +1,6 @@
 // service-worker.js
 console.log("[SERVICE-WORKER] Service worker loaded");
+const browser = globalThis.browser || globalThis.chrome;
 
 const API_ENDPOINTS = [
 	"http://localhost:3000",
@@ -8,7 +9,7 @@ const API_ENDPOINTS = [
 ];
 
 // Register extension when installed or updated
-chrome.runtime.onInstalled.addListener(async (details) => {
+browser.runtime.onInstalled.addListener(async (details) => {
 	console.log("[SERVICE-WORKER] Extension installed/updated:", details);
 
 	if (details.reason === "install") {
@@ -23,12 +24,15 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 });
 
 // Register extension when browser starts (if already installed)
-chrome.runtime.onStartup.addListener(async () => {
+browser.runtime.onStartup.addListener(async () => {
 	console.log("[SERVICE-WORKER] Browser startup - checking registration...");
 
 	// Check if we have a valid token
 	const { apiConnections, activeApiEndpoint } =
-		await chrome.storage.local.get(["apiConnections", "activeApiEndpoint"]);
+		await browser.storage.local.get([
+			"apiConnections",
+			"activeApiEndpoint",
+		]);
 
 	const activeConnection = activeApiEndpoint
 		? apiConnections?.[activeApiEndpoint]
@@ -48,11 +52,11 @@ async function registerExtension() {
 	console.log("[SERVICE-WORKER] Starting extension registration...");
 
 	try {
-		const manifest = chrome.runtime.getManifest();
-		const extensionId = chrome.runtime.id;
+		const manifest = browser.runtime.getManifest();
+		const extensionId = browser.runtime.id;
 
 		// Get current storage to preserve existing connections
-		const storage = await chrome.storage.local.get([
+		const storage = await browser.storage.local.get([
 			"apiConnections",
 			"activeApiEndpoint",
 		]);
@@ -146,7 +150,7 @@ async function registerExtension() {
 		}
 
 		// Save all connection data and set active endpoint
-		await chrome.storage.local.set({
+		await browser.storage.local.set({
 			apiConnections: apiConnections,
 			activeApiEndpoint: storage.activeApiEndpoint || connectedEndpoint,
 		});
@@ -158,7 +162,7 @@ async function registerExtension() {
 
 		// Show success notification
 		try {
-			await chrome.notifications.create({
+			await browser.notifications.create({
 				type: "basic",
 				iconUrl: "icon48.png",
 				title: "Calyx Connected",
@@ -178,7 +182,7 @@ async function registerExtension() {
 
 		// Show error notification
 		try {
-			await chrome.notifications.create({
+			await browser.notifications.create({
 				type: "basic",
 				iconUrl: "icon48.png",
 				title: "Extension Connection Failed",
@@ -195,7 +199,7 @@ async function registerExtension() {
 }
 
 // Handle messages from popup or content scipts
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	console.log("[SERVICE-WORKER] Message received:", message);
 
 	if (message.action === "connectToEndpoint") {
@@ -243,7 +247,7 @@ async function connectToSpecificEndpoint(endpoint) {
 
 	try {
 		// Get existing connections
-		const storage = await chrome.storage.local.get(["apiConnections"]);
+		const storage = await browser.storage.local.get(["apiConnections"]);
 		const apiConnections = storage.apiConnections || {};
 
 		// Check if we already have a valid token for this endpoint
@@ -258,7 +262,7 @@ async function connectToSpecificEndpoint(endpoint) {
 			);
 
 			// Just set this as the active endpoint
-			await chrome.storage.local.set({
+			await browser.storage.local.set({
 				activeApiEndpoint: endpoint,
 			});
 
@@ -266,8 +270,8 @@ async function connectToSpecificEndpoint(endpoint) {
 		}
 
 		// Need to register for this endpoint
-		const manifest = chrome.runtime.getManifest();
-		const extensionId = chrome.runtime.id;
+		const manifest = browser.runtime.getManifest();
+		const extensionId = browser.runtime.id;
 
 		const response = await fetch(
 			`${endpoint}/api/crispnow/extension/register`,
@@ -305,7 +309,7 @@ async function connectToSpecificEndpoint(endpoint) {
 		};
 
 		// Save connections and set as active
-		await chrome.storage.local.set({
+		await browser.storage.local.set({
 			apiConnections: apiConnections,
 			activeApiEndpoint: endpoint,
 		});
@@ -320,7 +324,7 @@ async function connectToSpecificEndpoint(endpoint) {
 		);
 
 		// Store the error for this endpoint
-		const storage = await chrome.storage.local.get(["apiConnections"]);
+		const storage = await browser.storage.local.get(["apiConnections"]);
 		const apiConnections = storage.apiConnections || {};
 
 		apiConnections[endpoint] = {
@@ -329,7 +333,7 @@ async function connectToSpecificEndpoint(endpoint) {
 			lastAttempt: new Date().toISOString(),
 		};
 
-		await chrome.storage.local.set({ apiConnections });
+		await browser.storage.local.set({ apiConnections });
 
 		throw error;
 	}
@@ -345,7 +349,7 @@ function isTokenExpired(connection) {
 
 // Check currenet registration status
 async function checkRegistrationStatus() {
-	const storage = await chrome.storage.local.get([
+	const storage = await browser.storage.local.get([
 		"apiConnections",
 		"activeApiEndpoint",
 	]);
@@ -394,7 +398,7 @@ async function checkRegistrationStatus() {
 
 // Get a valid API token for making requests
 async function getValidApiToken() {
-	const storage = await chrome.storage.local.get([
+	const storage = await browser.storage.local.get([
 		"apiConnections",
 		"activeApiEndpoint",
 	]);
@@ -435,9 +439,9 @@ async function getValidApiToken() {
 }
 
 // Periodic token check (check every hour) - DISABLED (manual connection required)
-// chrome.alarms.create("checkToken", { periodInMinutes: 1440 });
+// browser.alarms.create("checkToken", { periodInMinutes: 1440 });
 
-// chrome.alarms.onAlarm.addListener(async (alarm) => {
+// browser.alarms.onAlarm.addListener(async (alarm) => {
 // 	if (alarm.name === "checkToken") {
 // 		console.log("[SERVICE-WORKER] Periodic token check...");
 

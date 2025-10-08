@@ -1,6 +1,7 @@
 console.log("[CONTENT] Content script loaded on:", window.location.href);
+const browser = globalThis.browser || globalThis.chrome;
 
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+browser.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 	console.log("[CONTENT] Message received:", request);
 
 	if (request.action === "extractStoreSchedule") {
@@ -121,7 +122,7 @@ async function extractMultipleWeeks(maxWeeks) {
 
 	const allSchedules = [];
 
-	const { selfUserData } = await chrome.storage.local.get(["selfUserData"]);
+	const { selfUserData } = await browser.storage.local.get(["selfUserData"]);
 	const store = selfUserData?.store;
 	if (store) {
 		console.log("[CONTENT] Found cached self user store:", store.name);
