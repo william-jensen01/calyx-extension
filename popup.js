@@ -124,7 +124,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (isConnecting) return;
 
 		// Use provided endpoint or fall back to selected endpoint
-		const targetEndpoint = endpointToConnect || selectedApiEndpoint;
+		const targetEndpoint =
+			!endpointToConnect || endpointToConnect instanceof PointerEvent
+				? selectedApiEndpoint
+				: endpointToConnect;
 		console.log("[POPUP] Connecting  to:", targetEndpoint);
 
 		isConnecting = true;
