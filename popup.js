@@ -194,31 +194,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		showStatus("Clearing connection data...", "info");
 
 		try {
-			// Get existing connections
-			const storage = await browser.storage.local.get([
-				"apiConnections",
-				"activeApiEndpoint",
-			]);
-			const apiConnections = storage.apiConnections || {};
-
-			// Clear only the selected endpoint's connection
-			if (apiConnections[selectedApiEndpoint]) {
-				delete apiConnections[selectedApiEndpoint];
-			}
-
-			// If this was the active endpoint, we need to clear that too
-			if (storage.activeApiEndpoint === selectedApiEndpoint) {
-				await browser.storage.local.set({
-					activeApiEndpoint: null,
-					apiConnections,
-				});
-
-				updateActiveEndpointIndicator(null);
-
-				// Disable API functionality until reconnected
-				postApiBtn.disabled = true;
-				postApiBtn.textContent = "API Unavailable";
-			}
+			await deleteConnection(selectedApiEndpoint);
 
 			showStatus("Re-connecting to endpoint...", "info");
 
@@ -242,6 +218,80 @@ document.addEventListener("DOMContentLoaded", function () {
 		refreshBtn.disabled = false;
 		refreshBtn.textContent = "Refresh";
 		updateConnectionStatus();
+	}
+
+	// MARK: Delete Connection
+	async function deleteConnection(apiBase) {
+		console.log("[POPUP] Deleting connection for:", apiBase);
+		if (!apiBase) return;
+
+		const storage = await browser.storage.local.get([
+			"apiConnections",
+			"activeApiEndpoint",
+		]);
+		const apiConnections = storage.apiConnections || {};
+
+		const token = apiConnections[apiBase]?.token;
+		console.log("[POPUP] Using token:", token);
+		if (!token) {
+			console.log("[POPUP] No token found for endpoint:", apiBase);
+			return;
+		}
+
+		const response = await fetch(
+			`${apiBase}/api/crispnow/extension/register`,
+			{
+				method: "DELETE",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${apiConnections[apiBase].token}`,
+				},
+			}
+		);
+
+		if (!response.ok && response.status !== 401) {
+			const errorText = await response.text();
+
+			console.warn(
+				`Failed to delete connection: ${response.status} - ${errorText}`
+			);
+
+			// Store the error for this endpoint
+			apiConnections[apiBase] = {
+				...apiConnections[apiBase],
+				unregistrationError: `${response.status} - ${errorText}`,
+				lastUnregistrationAttempt: new Date().toISOString(),
+			};
+			throw new Error(
+				`Failed to delete connection: ${response.status} - ${errorText}`
+			);
+		}
+
+		delete apiConnections[apiBase];
+
+		const changes = {
+			apiConnections,
+			activeApiEndpoint: storage.activeApiEndpoint,
+		};
+
+		// If this was the active endpoint, we need to clear that too
+		if (storage.activeApiEndpoint === selectedApiEndpoint) {
+			// await browser.storage.local.set({
+			// 	activeApiEndpoint: null,
+			// 	apiConnections,
+			// });
+			changes.activeApiEndpoint = null;
+
+			updateActiveEndpointIndicator(null);
+
+			// Disable API functionality until reconnected
+			postApiBtn.disabled = true;
+			postApiBtn.textContent = "API Unavailable";
+		}
+
+		await browser.storage.local.set(changes);
+
+		console.log("[POPUP] Connection deleted successfully");
 	}
 
 	// MARK: Update Connection Status
