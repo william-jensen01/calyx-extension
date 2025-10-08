@@ -1,0 +1,32 @@
+{
+	"manifest_version": 3,
+	"name": "Crispnow to Calyx",
+	"version": "1.0",
+	"description": "Extract multi-store employee schedules from Crispnow and send to Calyx",
+	"permissions": [
+		"activeTab",
+		"downloads",
+		"storage",
+		"notifications",
+		"alarms"
+	],
+	"host_permissions": ["http://localhost:3000/*", "http://10.0.0.188:3000/*"],
+	"background": {
+		"service_worker": "service-worker.js"
+	},
+	"action": {
+		"default_popup": "popup.html",
+		"default_title": "Extract Multi-Store Schedules"
+	},
+	"content_scripts": [
+		{
+			"matches": ["<all_urls>"],
+			"js": ["content.js"]
+		}
+	],
+	"icons": {
+		"16": "icon16.png",
+		"48": "icon48.png",
+		"128": "icon128.png"
+	}
+}
