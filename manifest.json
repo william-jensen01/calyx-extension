@@ -10,7 +10,11 @@
 		"notifications",
 		"alarms"
 	],
-	"host_permissions": ["http://localhost:3000/*", "http://10.0.0.188:3000/*"],
+	"host_permissions": [
+		"http://localhost:3000/*",
+		"http://10.0.0.188:3000/*",
+		"https://calyx.williambjensen.com/*"
+	],
 	"background": {
 		"service_worker": "service-worker.js"
 	},
