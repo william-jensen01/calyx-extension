@@ -1,5 +1,7 @@
 const browser = globalThis.browser || globalThis.chrome;
 
+let customEndpointUrl = "";
+let savedCustomEndpoints = [];
 let extractedSchedule = [];
 let extractedSelf = null;
 let extractedUsers = [];
@@ -19,6 +21,7 @@ let availableDataTypes = [];
 document.addEventListener("DOMContentLoaded", function () {
 	const status = document.getElementById("status");
 	const apiEndpointSelect = document.getElementById("apiEndpointSelect");
+	const customEndpointInput = document.getElementById("customEndpointInput");
 	const connectBtn = document.getElementById("connectBtn");
 	const refreshBtn = document.getElementById("refreshBtn");
 	const selfBtn = document.getElementById("selfBtn");
@@ -35,6 +38,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const schedulePreview = document.getElementById("schedulePreview");
 
 	apiEndpointSelect.addEventListener("change", handleEndpointChange);
+	customEndpointInput.addEventListener("input", handleCustomEndpointInput);
 	connectBtn.addEventListener("click", handleConnect);
 	refreshBtn.addEventListener("click", refreshConnection);
 	selfBtn.addEventListener("click", extractSelf);
@@ -61,39 +65,75 @@ document.addEventListener("DOMContentLoaded", function () {
 		console.log("[POPUP] Loading API enpdoint reference...");
 
 		try {
+			// load saved custom endpoints first
+			await loadSavedCustomEndpoints();
+
 			const result = await browser.storage.local.get([
 				"apiConnections",
 				"activeApiEndpoint",
+				"customEndpointUrl",
 			]);
 
-			// Use active endpoint or default
-			selectedApiEndpoint =
-				result.activeApiEndpoint || "https://calyx.williambjensen.com";
+			// Load custom URL if saved
+			if (result.customEndpointUrl) {
+				customEndpointUrl = result.customEndpointUrl;
+				customEndpointInput.value = customEndpointUrl;
+			}
 
-			// Set the select value
-			apiEndpointSelect.value = selectedApiEndpoint;
+			// Check if active endpoint is a custom URL
+			const activeEndpoint = result.activeApiEndpoint;
+			const defaultEndpoints = [
+				"http://localhost:3000",
+				"https://calyx.williambjensen.com",
+			];
+			const isDefaultEndpoint = defaultEndpoints.includes(activeEndpoint);
+			const isSavedCustomEndpoint =
+				savedCustomEndpoints.includes(activeEndpoint);
 
-			console.log(
-				"[POPUP] Loaded preferred endpoint:",
-				selectedApiEndpoint
-			);
+			if (
+				activeEndpoint &&
+				!isDefaultEndpoint &&
+				!isSavedCustomEndpoint
+			) {
+				// Active endpoint is a new custom URL
+				apiEndpointSelect.value = "custom";
+				customEndpointUrl = activeEndpoint;
+				customEndpointInput.value = activeEndpoint;
+				selectedApiEndpoint = activeEndpoint;
+				document.getElementById(
+					"customEndpointContainer"
+				).style.display = "block";
+			} else if (activeEndpoint) {
+				// Use active endpoint (default or saved custom)
+				selectedApiEndpoint = activeEndpoint;
+				apiEndpointSelect.value = activeEndpoint;
+				document.getElementById(
+					"customEndpointContainer"
+				).style.display = "none";
+			} else {
+				// No active endpoint, default to production
+				selectedApiEndpoint = "https://calyx.williambjensen.com";
+				apiEndpointSelect.value = selectedApiEndpoint;
+				document.getElementById(
+					"customEndpointContainer"
+				).style.display = "none";
+			}
+
+			console.log("[POPUP] Loaded active endpoint:", selectedApiEndpoint);
 			console.log(
 				"[POPUP] Available connections:",
 				Object.keys(result.apiConnections || {})
 			);
 
 			// Update the indicator
-			if (result.activeApiEndpoint) {
+			if (activeEndpoint) {
 				const activeConnection =
-					result.apiConnections?.[result.activeApiEndpoint];
+					result.apiConnections?.[activeEndpoint];
 				const isConnected =
 					activeConnection &&
 					activeConnection.token &&
 					!activeConnection.registrationError;
-				updateActiveEndpointIndicator(
-					result.activeApiEndpoint,
-					isConnected
-				);
+				updateActiveEndpointIndicator(activeEndpoint, isConnected);
 			} else {
 				updateActiveEndpointIndicator(null);
 			}
@@ -112,13 +152,208 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// MARK: Handle Endpoint Change
 	function handleEndpointChange() {
-		const newEndpoint = apiEndpointSelect.value;
-		console.log("[POPUP] Endpoint changed to:", newEndpoint);
+		const selectValue = apiEndpointSelect.value;
+		console.log("[POPUP] Endpoint changed to:", selectValue);
 
-		selectedApiEndpoint = newEndpoint;
+		// Show/hide custom input
+		const customContainer = document.getElementById(
+			"customEndpointContainer"
+		);
+		if (selectValue === "custom") {
+			customContainer.style.display = "block";
+
+			// Use the custom URL if available
+			selectedApiEndpoint = customEndpointUrl || "";
+
+			// Disable connect until valid URL entered
+			console.log(
+				"[POPUP] Custom URL:",
+				selectedApiEndpoint,
+				"isValid?",
+				isValidUrl(selectedApiEndpoint)
+			);
+			connectBtn.disabled = !isValidUrl(selectedApiEndpoint);
+			connectBtn.textContent = "Connect";
+		} else {
+			customContainer.style.display = "none";
+			selectedApiEndpoint = selectValue;
+
+			connectBtn.disabled = false;
+			connectBtn.textContent = "Connect";
+		}
 
 		// Update connection status - don't auto-connect, let users click Connect
 		updateConnectionStatus();
+	}
+
+	// MARK: Custom Endpoint
+	function handleCustomEndpointInput() {
+		customEndpointUrl = customEndpointInput.value.trim();
+
+		// Update the selected endpoint to use the custom URL
+		if (apiEndpointSelect.value === "custom") {
+			selectedApiEndpoint = customEndpointUrl;
+
+			// Save to storage
+			browser.storage.local.set({ customEndpointUrl: customEndpointUrl });
+
+			// Enable/disable connect button based on valid URL
+			connectBtn.disabled = !isValidUrl(customEndpointUrl);
+		}
+	}
+
+	function isValidUrl(string) {
+		try {
+			const url = new URL(string);
+			return url.protocol === "http:" || url.protocol === "https:";
+		} catch (_) {
+			return false;
+		}
+	}
+
+	// MARK: Load Saved Custom Endpoints
+	async function loadSavedCustomEndpoints() {
+		try {
+			const result = await browser.storage.local.get([
+				"savedCustomEndpoints",
+			]);
+			savedCustomEndpoints = result.savedCustomEndpoints || [];
+			console.log(
+				"[POPUP] Loaded saved custom endpoints:",
+				savedCustomEndpoints
+			);
+			rebuildEndpointSelectOptions();
+		} catch (error) {
+			console.error(
+				"[POPUP] Error loading saved custom endpoints:",
+				error
+			);
+		}
+	}
+
+	// MARK: Rebuild Endpoint Select Options
+	function rebuildEndpointSelectOptions() {
+		const currentValue = apiEndpointSelect.value;
+		apiEndpointSelect.innerHTML = "";
+
+		// Default endpoints at top
+		const defaultEndpoints = [
+			{
+				value: "http://localhost:3000",
+				label: "Local Development (localhost:3000)",
+			},
+			{
+				value: "https://calyx.williambjensen.com",
+				label: "Production (calyx.williambjensen.com)",
+			},
+		];
+
+		defaultEndpoints.forEach((ep) => {
+			const option = document.createElement("option");
+			option.value = ep.value;
+			option.textContent = ep.label;
+			apiEndpointSelect.appendChild(option);
+		});
+
+		// Saved custom endpoints in middle
+		if (savedCustomEndpoints.length > 0) {
+			savedCustomEndpoints.forEach((customUrl) => {
+				const option = document.createElement("option");
+				option.value = customUrl;
+				option.textContent = customUrl;
+				apiEndpointSelect.appendChild(option);
+			});
+		}
+
+		// "Custom URL..." option at bottom
+		const customOption = document.createElement("option");
+		customOption.value = "custom";
+		customOption.textContent = "Custom URL...";
+		apiEndpointSelect.appendChild(customOption);
+
+		// Restore previous selection if it still exists
+		const optionExists = Array.from(apiEndpointSelect.options).some(
+			(opt) => opt.value === selectedApiEndpoint
+		);
+		if (optionExists) {
+			apiEndpointSelect.value = currentValue;
+		}
+	}
+
+	// MARK: Save Custom Endpoint
+	async function saveCustomEndpoint(url) {
+		try {
+			// Don't save if it's a default endpoint
+			const defaultEndpoints = [
+				"http://localhost:3000",
+				"https://calyx.williambjensen.com",
+			];
+
+			// don't save if it's default or already saved
+			if (
+				defaultEndpoints.includes(url) ||
+				savedCustomEndpoints.includes(url)
+			) {
+				return;
+			}
+
+			savedCustomEndpoints.push(url);
+
+			await browser.storage.local.set({
+				savedCustomEndpoints: savedCustomEndpoints,
+			});
+
+			console.log("[POPUP] Saved custom endpoint", url);
+
+			rebuildEndpointSelectOptions();
+
+			// Select the newly saved endpoint
+			apiEndpointSelect.value = url;
+			selectedApiEndpoint = url;
+
+			// Hide custom input since we now have it as an option
+			document.getElementById("customEndpointContainer").style.display =
+				"none";
+		} catch (error) {
+			console.error("[POPUP] Error saving custom endpoint:", error);
+		}
+	}
+
+	// MARK: Request Permission
+	async function requestPermissionForCustomURL(url) {
+		try {
+			const urlObj = new URL(url);
+			const origin = `${urlObj.protocol}//${urlObj.host}/*`;
+
+			console.log("[POPUP] Checking permission for:", origin);
+
+			// Check if we already have permission
+			const hasPermission = await browser.permissions.contains({
+				origins: [origin],
+			});
+
+			if (hasPermission) {
+				console.log("[POPUP] Permission already granted");
+				return true;
+			}
+
+			console.log("[POPUP] Requesting permission for custom endpoint...");
+
+			// Request permission
+			const granted = await browser.permissions.request({
+				origins: [origin],
+			});
+
+			if (!granted) {
+				throw new Error("Permission denied for custom url");
+			}
+
+			console.log("[POPUP] Permission granted");
+			return true;
+		} catch (error) {
+			console.error("[POPUP] Error requesting permission:", error);
+			throw error;
+		}
 	}
 
 	// MARK: Handle Connect
@@ -131,6 +366,23 @@ document.addEventListener("DOMContentLoaded", function () {
 				? selectedApiEndpoint
 				: endpointToConnect;
 		console.log("[POPUP] Connecting  to:", targetEndpoint);
+
+		// Check if this is a custom endpoint and request permission
+		const defaultEndpoints = [
+			"http://localhost:3000",
+			"https://calyx.williambjensen.com",
+		];
+		const isCustomEndpoint = !defaultEndpoints.includes(targetEndpoint);
+
+		if (isCustomEndpoint) {
+			try {
+				showStatus("Requesting permission for custom url...", "info");
+				await requestPermissionForCustomURL(targetEndpoint);
+			} catch (error) {
+				showStatus(`Permission required: ${error.message}`, "error");
+				return { success: false, error: error.message };
+			}
+		}
 
 		isConnecting = true;
 		connectBtn.disabled = true;
@@ -158,6 +410,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
 				// Update the active endpoint indicator
 				updateActiveEndpointIndicator(targetEndpoint, true);
+
+				// Save custom endpoint if it was a custom url
+				if (apiEndpointSelect.value === "custom") {
+					await saveCustomEndpoint(targetEndpoint);
+				}
 
 				// Update the API functionality
 				postApiBtn.disabled = false;
@@ -297,6 +554,15 @@ document.addEventListener("DOMContentLoaded", function () {
 	// MARK: Update Connection Status
 	async function updateConnectionStatus() {
 		try {
+			// Special handling for custom endpoints
+			if (apiEndpointSelect.value === "custom") {
+				if (!isValidUrl(selectedApiEndpoint)) {
+					connectBtn.textContent = "Connect";
+					connectBtn.disabled = true; // Disabled until valid URL
+					return;
+				}
+			}
+
 			const storage = await browser.storage.local.get([
 				"apiConnections",
 				"activeApiEndpoint",

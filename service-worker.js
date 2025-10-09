@@ -4,7 +4,6 @@ const browser = globalThis.browser || globalThis.chrome;
 
 const API_ENDPOINTS = [
 	"http://localhost:3000",
-	"http://10.0.0.188:3000",
 	"https://calyx.williambjensen.com",
 ];
 

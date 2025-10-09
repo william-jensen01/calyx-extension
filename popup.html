@@ -574,6 +574,15 @@
 				color: #f57c00;
 			}
 			/* #endregion */
+
+			#customEndpointContainer {
+				margin-top: 8px;
+			}
+
+			#customEndpointInput {
+				font-family: "Consolas", "Monaco", monospace;
+				font-size: 12px;
+			}
 		</style>
 	</head>
 	<body class="flow-step-1">
@@ -593,13 +602,30 @@
 					<option value="http://localhost:3000">
 						Local Development (localhost:3000)
 					</option>
-					<option value="http://10.0.0.188:3000">
-						Local Network (10.0.0.188:3000)
-					</option>
 					<option value="https://calyx.williambjensen.com">
 						Production (calyx.williambjensen.com)
 					</option>
+					<option value="custom">Custom URL...</option>
 				</select>
+			</div>
+			<div
+				id="customEndpointContainer"
+				class="form-group"
+				style="display: none"
+			>
+				<label class="form-label" for="customEndpointInput"
+					>Custom Endpoint URL:</label
+				>
+				<input
+					type="text"
+					id="customEndpointInput"
+					class="form-input"
+					placeholder="https://api.example.com"
+				/>
+				<div class="input-hint">
+					Enter the full URL (e.g., https://api.example.com or
+					http://192.168.1.100:3000)
+				</div>
 			</div>
 			<div class="api-buttons">
 				<button id="connectBtn" class="api-btn connect-btn">
